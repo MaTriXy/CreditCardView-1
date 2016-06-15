@@ -16,9 +16,9 @@ public class FlipAnimator extends Animation {
 
     private View toView;
 
-    private float centerX;
+    private final float centerX;
 
-    private float centerY;
+    private final float centerY;
 
     private boolean forward = true;
 
@@ -127,9 +127,7 @@ public class FlipAnimator extends Animation {
         else {
         	camera.rotateX(degrees);
         }
-
         
-//        camera.rotateY(degrees);
         camera.getMatrix(matrix);
         camera.restore();
 
