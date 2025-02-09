@@ -23,27 +23,11 @@ import io.codetail.animation.ViewAnimationUtils;
  */
 public class CreditCardView extends FrameLayout {
 
-
-    public String getCardHolderName() {
-        return mCardHolderName;
-    }
-
-    public String getCVV() {
-        return mCVV;
-    }
-
-    public String getExpiry() {
-        return mExpiry;
-    }
-
-    interface ICustomCardSelector {
-        CardSelector getCardSelector(String cardNumber);
-    }
-
     private static final int TEXTVIEW_CARD_HOLDER_ID = R.id.front_card_holder_name;
     private static final int TEXTVIEW_CARD_EXPIRY_ID = R.id.front_card_expiry;
     private static final int TEXTVIEW_CARD_NUMBER_ID = R.id.front_card_number;
     private static final int TEXTVIEW_CARD_CVV_ID = R.id.back_card_cvv;
+    private static final int TEXTVIEW_CARD_CVV_AMEX_ID = R.id.front_card_cvv;
     private static final int FRONT_CARD_ID = R.id.front_card_container;
     private static final int BACK_CARD_ID = R.id.back_card_container;
     private static final int FRONT_CARD_OUTLINE_ID = R.id.front_card_outline;
@@ -56,6 +40,12 @@ public class CreditCardView extends FrameLayout {
 
     private String mCardHolderName, mCVV, mExpiry;
 
+    private CreditCardUtils.CardType mCardType;
+
+    private boolean changeCardColor;
+    private boolean showCardAnimation;
+
+    int mCardnameLen;
 
     public CreditCardView(Context context) {
         super(context);
@@ -72,11 +62,29 @@ public class CreditCardView extends FrameLayout {
         init(attrs);
     }
 
+    public String getCardHolderName() {
+        return mCardHolderName;
+    }
+
+    public String getCVV() {
+        return mCVV;
+    }
+
+    public String getExpiry() {
+        return mExpiry;
+    }
+
+    public CreditCardUtils.CardType getCardType() { return mCardType; }
+
+    interface ICustomCardSelector {
+        CardSelector getCardSelector(String cardNumber);
+    }
+    
     private void init() {
 
         mCurrentDrawable = R.drawable.card_color_round_rect_default;
         mRawCardNumber = "";
-
+        mCardnameLen = getResources().getInteger(R.integer.card_name_len);
         LayoutInflater inflater = (LayoutInflater) getContext()
                 .getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         inflater.inflate(R.layout.view_creditcard, this, true);
@@ -94,6 +102,17 @@ public class CreditCardView extends FrameLayout {
         String cardHolderName = a.getString(R.styleable.creditcard_card_holder_name);
         String expiry = a.getString(R.styleable.creditcard_card_expiration);
         String cardNumber = a.getString(R.styleable.creditcard_card_number);
+
+        changeCardColor = a.getBoolean(R.styleable.creditcard_change_card_color, true);
+        showCardAnimation = a.getBoolean(R.styleable.creditcard_show_card_animation, true);
+        boolean showChipOnCard = a.getBoolean(R.styleable.creditcard_show_chip_on_card, true);
+        if(!showChipOnCard) {
+            View chipContainer = findViewById(R.id.chip_container);
+            if(chipContainer != null) {
+                chipContainer.setVisibility(View.INVISIBLE);
+            }
+        }
+
         int cvv = a.getInt(R.styleable.creditcard_cvv, 0);
         int cardSide = a.getInt(R.styleable.creditcard_card_side,CreditCardUtils.CARD_SIDE_FRONT);
 
@@ -165,17 +184,19 @@ public class CreditCardView extends FrameLayout {
 
 
         this.mRawCardNumber = rawCardNumber == null ? "" : rawCardNumber;
+        this.mCardType = CreditCardUtils.selectCardType(this.mRawCardNumber);
+        String cardNumber = CreditCardUtils.formatCardNumber(this.mRawCardNumber, CreditCardUtils.SPACE_SEPERATOR);
 
-        String newCardNumber = mRawCardNumber;
-        for(int i=mRawCardNumber.length();i<16;i++) {
-            newCardNumber +=CreditCardUtils.CHAR_X;
-        }
-
-        String cardNumber = CreditCardUtils.handleCardNumber(newCardNumber, CreditCardUtils.DOUBLE_SPACE_SEPERATOR);
         ((TextView)findViewById(TEXTVIEW_CARD_NUMBER_ID)).setText(cardNumber);
+        ((TextView)findViewById(TEXTVIEW_CARD_CVV_AMEX_ID)).setVisibility(mCardType == CreditCardUtils.CardType.AMEX_CARD ? View.VISIBLE : View.GONE);
 
-        if(mRawCardNumber.length() == 3) {
-            revealCardAnimation();
+        if(this.mCardType != CreditCardUtils.CardType.UNKNOWN_CARD) {
+            this.post(new Runnable() {
+                @Override
+                public void run() {
+                    revealCardAnimation();
+                }
+            });
         }
         else {
             paintCard();
@@ -218,6 +239,7 @@ public class CreditCardView extends FrameLayout {
 
         this.mCVV = cvv;
         ((TextView)findViewById(TEXTVIEW_CARD_CVV_ID)).setText(cvv);
+        ((TextView)findViewById(TEXTVIEW_CARD_CVV_AMEX_ID)).setText(cvv);
     }
 
     public void setCardExpiry(String dateYear) {
@@ -234,8 +256,8 @@ public class CreditCardView extends FrameLayout {
     public void setCardHolderName(String cardHolderName) {
 
         cardHolderName = cardHolderName == null ? "" : cardHolderName;
-        if(cardHolderName.length() > 16) {
-            cardHolderName = cardHolderName.substring(0,16);
+        if(cardHolderName.length() > mCardnameLen) {
+            cardHolderName = cardHolderName.substring(0,mCardnameLen);
         }
 
         this.mCardHolderName = cardHolderName;
@@ -269,8 +291,10 @@ public class CreditCardView extends FrameLayout {
         ImageView backLogoImageView = (ImageView) findViewById(BACK_CARD_ID).findViewById(R.id.logo_img);
         backLogoImageView.setImageResource(card.getResLogoId());
 
-        cardBack.setBackgroundResource(card.getResCardId());
-        cardFront.setBackgroundResource(card.getResCardId());
+        if(changeCardColor) {
+            cardBack.setBackgroundResource(card.getResCardId());
+            cardFront.setBackgroundResource(card.getResCardId());
+        }
     }
 
 
@@ -283,7 +307,9 @@ public class CreditCardView extends FrameLayout {
 
         paintCard();
 
-        animateChange(cardContainer, cardFront, card.getResCardId());
+        if(showCardAnimation && changeCardColor) {
+            animateChange(cardContainer, cardFront, card.getResCardId());
+        }
     }
 
     public CardSelector selectCard() {

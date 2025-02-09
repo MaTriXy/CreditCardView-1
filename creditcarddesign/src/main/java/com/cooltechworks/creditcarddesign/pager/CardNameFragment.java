@@ -27,7 +27,6 @@ public class CardNameFragment extends CreditCardFragment {
 
         View v = inflater.inflate(R.layout.lyt_card_holder_name, group,false);
         mCardNameView = (EditText) v.findViewById(R.id.card_name);
-        mCardNameView.addTextChangedListener(this);
 
         String name = "";
         if(getArguments() != null && getArguments().containsKey(EXTRA_CARD_HOLDER_NAME)) {
@@ -40,6 +39,7 @@ public class CardNameFragment extends CreditCardFragment {
         }
 
         mCardNameView.setText(name);
+        mCardNameView.addTextChangedListener(this);
 
         return v;
     }
@@ -48,7 +48,7 @@ public class CardNameFragment extends CreditCardFragment {
     public void afterTextChanged(Editable s) {
 
         onEdit(s.toString());
-        if(s.length() == 16) {
+        if(s.length() == getResources().getInteger(R.integer.card_name_len)) {
             onComplete();
         }
     }
